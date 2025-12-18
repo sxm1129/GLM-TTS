@@ -95,6 +95,33 @@ bash glmtts_inference.sh
 python -m tools.gradio_app
 ```
 
+#### API 服务器部署
+
+GLM-TTS 提供了完整的 FastAPI 服务器，支持并发控制和动态超时。
+
+**快速启动（推荐）**:
+```bash
+# 使用默认配置启动
+bash restart_api.sh
+
+# 使用自定义配置启动
+SHORT_TEXT_CONCURRENCY=15 LONG_TEXT_CONCURRENCY=5 bash restart_api.sh
+```
+
+**配置说明**:
+- `SHORT_TEXT_CONCURRENCY`: 短文本（≤200字符）并发数，默认 10
+- `LONG_TEXT_CONCURRENCY`: 长文本（>200字符）并发数，默认 3
+- `WORKERS`: uvicorn 工作进程数，默认 1
+- `SHORT_TEXT_TIMEOUT`: 短文本超时时间（秒），默认 60
+- `LONG_TEXT_TIMEOUT`: 长文本超时时间（秒），默认 600
+
+**API 端点**:
+- `POST /api/v1/tts`: 生成语音
+- `GET /api/v1/health`: 健康检查
+- `GET /api/v1/stats/concurrency`: 并发统计信息
+
+**详细文档**: 请参考 [`API_SERVICE_MANAGEMENT.md`](API_SERVICE_MANAGEMENT.md) 和 [`OPTIMIZATION_ARCHITECTURE.md`](OPTIMIZATION_ARCHITECTURE.md)
+
 ## 系统架构
 
 ### 整体架构
@@ -222,8 +249,16 @@ GLM-TTS/
 │   └── cosyvoice_frontend.yaml      # 前端配置
 ├── tools/                           # 工具脚本
 │   ├── gradio_app.py                # Gradio交互界面
+│   ├── api_server.py                # FastAPI服务器（支持并发控制和动态超时）
+│   ├── config.py                    # 配置管理模块
+│   ├── concurrency_manager.py       # 并发控制管理器
 │   ├── ffmpeg_speech_control.py     # 音频处理工具
 │   └── flow_reconstruct.py          # 音频重建
+├── start_api.sh                     # API服务器启动脚本
+├── restart_api.sh                   # API服务器重启脚本（推荐，自动清理资源）
+├── env.example                      # 环境变量配置示例
+├── API_SERVICE_MANAGEMENT.md        # API服务管理指南
+├── OPTIMIZATION_ARCHITECTURE.md     # 优化架构说明文档
 └── utils/                           # 通用工具
     ├── tts_model_util.py            # TTS模型工具
     ├── yaml_util.py                 # YAML配置加载工具

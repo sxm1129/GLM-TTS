@@ -19,6 +19,7 @@ import os
 from glmtts_inference import (
     load_models,
     generate_long,
+    local_llm_forward,
     DEVICE
 )
 
@@ -29,15 +30,18 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 MODEL_CACHE = {
     "loaded": False,
     "sample_rate": None,
+    "use_phoneme": None,
     "components": None
 }
 
 def get_models(use_phoneme=False, sample_rate=24000):
     """
-    Lazy loader for models. Reloads if sample_rate changes.
+    Lazy loader for models. Reloads if sample_rate or use_phoneme changes.
     """
-    # Check if loaded and if sample_rate matches
-    if MODEL_CACHE["loaded"] and MODEL_CACHE["sample_rate"] == sample_rate:
+    # Check if loaded and if sample_rate and use_phoneme match
+    if (MODEL_CACHE["loaded"] and 
+        MODEL_CACHE["sample_rate"] == sample_rate and 
+        MODEL_CACHE["use_phoneme"] == use_phoneme):
         return MODEL_CACHE["components"]
     
     logging.info(f"Loading models with sample_rate={sample_rate}...")
@@ -57,13 +61,30 @@ def get_models(use_phoneme=False, sample_rate=24000):
     
     MODEL_CACHE["components"] = (frontend, text_frontend, speech_tokenizer, llm, flow)
     MODEL_CACHE["sample_rate"] = sample_rate
+    MODEL_CACHE["use_phoneme"] = use_phoneme
     MODEL_CACHE["loaded"] = True
-    logging.info("Models loaded successfully.")
+    logging.info(f"Models loaded successfully. (sample_rate={sample_rate}, use_phoneme={use_phoneme})")
     return MODEL_CACHE["components"]
 
-def run_inference(prompt_text, prompt_audio_path, input_text, seed, sample_rate, use_cache=True):
+def custom_local_llm_forward(llm, prompt_text_token, tts_text_token, prompt_speech_token, 
+                              beam_size=1, sampling=25, sample_method="ras"):
     """
-    Main inference handler for Gradio.
+    Custom wrapper for local_llm_forward with all parameters.
+    """
+    return local_llm_forward(
+        llm=llm,
+        prompt_text_token=prompt_text_token,
+        tts_text_token=tts_text_token,
+        prompt_speech_token=prompt_speech_token,
+        beam_size=beam_size,
+        sampling=sampling,
+        sample_method=sample_method
+    )
+
+def run_inference(prompt_text, prompt_audio_path, input_text, seed, sample_rate, 
+                  use_cache, use_phoneme, sample_method, sampling, beam_size):
+    """
+    Main inference handler for Gradio with all advanced features.
     """
     if not input_text:
         raise gr.Error("Please provide text to synthesize.")
@@ -73,8 +94,8 @@ def run_inference(prompt_text, prompt_audio_path, input_text, seed, sample_rate,
         gr.Warning("Prompt text is empty. Results might be suboptimal.")
 
     try:
-        # 1. Load Models (Pass sample_rate)
-        frontend, text_frontend, _, llm, flow = get_models(use_phoneme=True, sample_rate=sample_rate)
+        # 1. Load Models (Pass sample_rate and use_phoneme)
+        frontend, text_frontend, _, llm, flow = get_models(use_phoneme=use_phoneme, sample_rate=sample_rate)
 
         # 2. Pre-process Prompt (Text Normalization)
         norm_prompt_text = text_frontend.text_normalize(prompt_text) + ' '
@@ -106,7 +127,20 @@ def run_inference(prompt_text, prompt_audio_path, input_text, seed, sample_rate,
             'use_cache': use_cache
         }
 
-        # 5. Run Generation
+        # 5. Run Generation with custom local_llm_forward
+        # Ensure parameters are correct types
+        beam_size = int(beam_size)
+        sampling = int(sampling)
+        
+        # Create a partial function with beam_size and sampling parameters
+        from functools import partial
+        custom_llm_forward = partial(
+            custom_local_llm_forward,
+            beam_size=beam_size,
+            sampling=sampling,
+            sample_method=sample_method
+        )
+        
         tts_speech, _, _, _ = generate_long(
             frontend=frontend,
             text_frontend=text_frontend,
@@ -117,10 +151,11 @@ def run_inference(prompt_text, prompt_audio_path, input_text, seed, sample_rate,
             embedding=embedding,
             flow_prompt_token=flow_prompt_token,
             speech_feat=speech_feat,
-            sample_method="ras",
+            sample_method=sample_method,
             seed=seed,
             device=DEVICE,
-            use_phoneme=False
+            use_phoneme=use_phoneme,
+            local_llm_forward=custom_llm_forward
         )
 
         # 6. Post-process Audio
@@ -149,6 +184,7 @@ def clear_memory():
     MODEL_CACHE["components"] = None
     MODEL_CACHE["loaded"] = False
     MODEL_CACHE["sample_rate"] = None
+    MODEL_CACHE["use_phoneme"] = None
     
     import gc
     gc.collect()
@@ -187,15 +223,46 @@ with gr.Blocks(title="GLMTTS Inference") as app:
             )
             
             with gr.Accordion("Advanced Settings", open=True):
-                # Update: Added Sample Rate selection
+                # Basic Settings
                 sample_rate = gr.Radio(
                     choices=[24000, 32000], 
                     value=24000, 
                     label="Sample Rate (Hz)",
                     info="Choose 32000 for higher quality if model supports it."
                 )
-                seed = gr.Number(label="Seed", value=42, precision=0)
+                seed = gr.Number(label="Seed", value=42, precision=0, info="Random seed for reproducibility")
                 use_cache = gr.Checkbox(label="Use KV Cache", value=True, info="Faster generation for long text.")
+                
+                # Phoneme Control
+                use_phoneme = gr.Checkbox(
+                    label="启用音素控制 (Phoneme Control)", 
+                    value=False, 
+                    info="解决多音字和生僻字发音问题，提高发音准确性"
+                )
+                
+                # Sampling Settings
+                sample_method = gr.Radio(
+                    choices=["ras", "topk"], 
+                    value="ras", 
+                    label="采样方法 (Sampling Method)",
+                    info="ras: Repetition-Aware Sampling (推荐) | topk: Top-K采样"
+                )
+                sampling = gr.Slider(
+                    minimum=1, 
+                    maximum=100, 
+                    value=25, 
+                    step=1, 
+                    label="采样参数 (Sampling/Top-K)",
+                    info="控制采样时的候选token数量，值越大多样性越高但可能降低质量"
+                )
+                beam_size = gr.Slider(
+                    minimum=1, 
+                    maximum=5, 
+                    value=1, 
+                    step=1, 
+                    label="Beam Size (束搜索)",
+                    info="值>1使用束搜索提升质量，但会增加计算时间和显存占用"
+                )
 
             generate_btn = gr.Button("🚀 Generate Audio", variant="primary", size="lg")
             clear_btn = gr.Button("🧹 Clear VRAM", variant="secondary")
@@ -208,7 +275,18 @@ with gr.Blocks(title="GLMTTS Inference") as app:
     # Event Bindings
     generate_btn.click(
         fn=run_inference,
-        inputs=[prompt_text, prompt_audio, input_text, seed, sample_rate, use_cache],
+        inputs=[
+            prompt_text, 
+            prompt_audio, 
+            input_text, 
+            seed, 
+            sample_rate, 
+            use_cache,
+            use_phoneme,
+            sample_method,
+            sampling,
+            beam_size
+        ],
         outputs=[output_audio]
     )
 

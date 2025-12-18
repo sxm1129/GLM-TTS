@@ -1,0 +1,8 @@
+/data1/miniconda3/envs/glm-tts_env/lib/python3.10/site-packages/jieba/_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+INFO:     Started server process [1530761]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8049 (Press CTRL+C to quit)
+Warning: failed to import ttsfrd, use WeTextProcessing instead
+INFO:     127.0.0.1:52246 - "GET /api/v1/health HTTP/1.1" 200 OK

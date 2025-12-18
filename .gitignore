@@ -60,7 +60,12 @@ modules/*
 
 *pyc
 model_cache/*
-*embs.tar
+*embs.tar 
 web_service/
 helps/
 ckpt/
+
+test_audio_outputs
+test_results_20251218_002555
+
+tests

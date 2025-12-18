@@ -95,6 +95,33 @@ bash glmtts_inference.sh
 python -m tools.gradio_app
 ```
 
+#### API Server Deployment
+
+GLM-TTS provides a complete FastAPI server with concurrency control and dynamic timeout.
+
+**Quick Start (Recommended)**:
+```bash
+# Start with default configuration
+bash restart_api.sh
+
+# Start with custom configuration
+SHORT_TEXT_CONCURRENCY=15 LONG_TEXT_CONCURRENCY=5 bash restart_api.sh
+```
+
+**Configuration**:
+- `SHORT_TEXT_CONCURRENCY`: Concurrency for short text (≤200 chars), default 10
+- `LONG_TEXT_CONCURRENCY`: Concurrency for long text (>200 chars), default 3
+- `WORKERS`: Number of uvicorn worker processes, default 1
+- `SHORT_TEXT_TIMEOUT`: Timeout for short text (seconds), default 60
+- `LONG_TEXT_TIMEOUT`: Timeout for long text (seconds), default 600
+
+**API Endpoints**:
+- `POST /api/v1/tts`: Generate speech
+- `GET /api/v1/health`: Health check
+- `GET /api/v1/stats/concurrency`: Concurrency statistics
+
+**Documentation**: See [`API_SERVICE_MANAGEMENT.md`](API_SERVICE_MANAGEMENT.md) and [`OPTIMIZATION_ARCHITECTURE.md`](OPTIMIZATION_ARCHITECTURE.md) for details
+
 ## System Architecture
 
 ### Overview
@@ -224,8 +251,16 @@ GLM-TTS/
 │   └── cosyvoice_frontend.yaml      # Frontend configuration
 ├── tools/                           # Tool scripts
 │   ├── gradio_app.py                # Gradio interactive interface
+│   ├── api_server.py                # FastAPI server (with concurrency control and dynamic timeout)
+│   ├── config.py                    # Configuration management module
+│   ├── concurrency_manager.py       # Concurrency control manager
 │   ├── ffmpeg_speech_control.py     # Audio processing tool
 │   └── flow_reconstruct.py          # Audio reconstruction
+├── start_api.sh                     # API server startup script
+├── restart_api.sh                   # API server restart script (recommended, auto-cleanup resources)
+├── env.example                      # Environment variable configuration example
+├── API_SERVICE_MANAGEMENT.md        # API service management guide
+└── OPTIMIZATION_ARCHITECTURE.md     # Optimization architecture documentation
 └── utils/                           # Common utilities
     ├── tts_model_util.py            # TTS model utilities
     ├── yaml_util.py                 # YAML configuration loading utility

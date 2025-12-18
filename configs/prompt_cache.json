@@ -1,0 +1,11 @@
+{
+    "exampleA": {
+        "prompt_audio_path": "examples/prompt/exampleA.mp3",
+        "prompt_text": "儿时眼睛大，睡觉确实闭不上，妈担心是聚角魔症，好在那时的医生都还磊落，说这孩子没病，妥妥的稳稳的美男子，面对现实吧。"
+    },
+    "exampleB": {
+        "prompt_audio_path": "examples/prompt/jiayan_zh1.wav",
+        "prompt_text": "他当时还跟线下其他的站姐吵架，然后，打架进局子了。"
+    }
+}
+

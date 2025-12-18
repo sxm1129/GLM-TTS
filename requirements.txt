@@ -25,6 +25,8 @@ einops==0.8.1
 emoji==2.14.1
 evaluation==0.0.2
 fastapi==0.123.9
+uvicorn==0.30.6
+python-multipart==0.0.9
 funasr==1.1.6
 gradio==6.1.0
 HyperPyYAML==1.2.2
